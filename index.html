@@ -1,0 +1,1756 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超級資本家｜桌遊輔助與計算驗證系統</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Noto Sans TC -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <!-- GSAP for Smooth Animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- Canvas Confetti for Celebration Animations -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'brand-cyan': '#18F0D5',    // 主要強調色、按鈕高亮
+                        'brand-lime': '#B7D46B',    // 資產資訊、成功狀態
+                        'brand-sage': '#79A89A',    // 卡片邊框、飾邊
+                        'brand-purple': '#63518A',  // 主要文字、深色區塊
+                        'brand-dark-purple': '#48396B',
+                        'brand-pink': '#F06B9A',    // 重要提示、警示按鈕
+                        'brand-cream': '#F8F6F0',   // 卡片底色
+                        'brand-[#F2F0E9]': '#F2F0E9'
+                    },
+                    fontFamily: {
+                        sans: ['Noto Sans TC', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #453564;
+            background-image: radial-gradient(#63518A 1.5px, transparent 1.5px);
+            background-size: 24px 24px;
+            color: #63518A;
+        }
+
+        /* 互動浮動效果 (Hover) */
+        .hover-lift {
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+        }
+        .hover-lift:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.25);
+        }
+
+        /* 木質桌面質感邊框 */
+        .main-wood-box {
+            background: #F8F6F0;
+            border: 4px solid #79A89A;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 凍結冰霜效果 (絕對菱度) */
+        .frozen-card {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%) !important;
+            border-color: #38bdf8 !important;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.6) !important;
+            position: relative;
+            overflow: hidden;
+        }
+        .frozen-card::after {
+            content: "❄️ 絕對菱度・凍結中";
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: rgba(56, 189, 248, 0.9);
+            color: white;
+            font-size: 10px;
+            font-weight: 900;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* BUFF 護盾效果 (桃之夭夭) */
+        .shield-card {
+            box-shadow: 0 0 20px rgba(183, 212, 107, 0.9), inset 0 0 15px rgba(183, 212, 107, 0.5) !important;
+            border-color: #79A89A !important;
+        }
+
+        /* 當前出牌玩家高亮樣式 */
+        .active-turn-card {
+            border-color: #18F0D5 !important;
+            border-width: 4px !important;
+            box-shadow: 0 0 25px rgba(24, 240, 213, 0.6) !important;
+            transform: translateY(-4px);
+        }
+
+        /* 自訂 Modal 背景遮罩 */
+        .modal-bg {
+            background-color: rgba(69, 53, 100, 0.85);
+            backdrop-filter: blur(6px);
+        }
+
+        /* 資產動態浮動氣泡 */
+        .floating-change-bubble {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-weight: 900;
+            font-size: 1.1rem;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        /* 破產 Stamp 印章效果 */
+        .bankrupt-stamp {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-12deg);
+            border: 4px solid #F06B9A;
+            color: #F06B9A;
+            font-size: 1.8rem;
+            font-weight: 900;
+            padding: 4px 16px;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            pointer-events: none;
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between pb-10 selection:bg-brand-cyan selection:text-brand-purple">
+
+    <!-- Navbar HEADER -->
+    <header id="siteHeader" class="bg-brand-purple border-b-4 border-brand-sage shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-brand-cyan text-brand-purple rounded-2xl flex items-center justify-center font-black text-xl shadow-md border-2 border-white">
+                    <i class="fa-solid fa-hand-holding-dollar"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black text-white tracking-wide flex items-center gap-2">
+                        超級資本家 <span class="text-xs bg-brand-pink text-white px-2 py-0.5 rounded-full font-bold">桌遊輔助版</span>
+                    </h1>
+                    <p class="text-[10px] sm:text-xs text-brand-lime font-medium">記錄資產・驗證計算・自動判斷勝負</p>
+                </div>
+            </div>
+
+            <!-- Page Navigation Tabs -->
+            <nav class="flex items-center gap-1 sm:gap-2">
+                <button onclick="switchPage('main')" id="tabMain" class="px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black bg-brand-cyan text-brand-purple shadow hover-lift transition flex items-center gap-1">
+                    <i class="fa-solid fa-gamepad"></i> <span class="hidden sm:inline">遊戲主畫面</span>
+                </button>
+                <button onclick="switchPage('cards')" id="tabCards" class="px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black bg-brand-purple text-white hover:bg-brand-dark-purple border border-white/20 hover-lift transition flex items-center gap-1">
+                    <i class="fa-solid fa-cards"></i> <span class="hidden sm:inline">事件卡圖鑑</span>
+                </button>
+                <button onclick="switchPage('rules')" id="tabRules" class="px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black bg-brand-purple text-white hover:bg-brand-dark-purple border border-white/20 hover-lift transition flex items-center gap-1">
+                    <i class="fa-solid fa-book-open"></i> <span class="hidden sm:inline">遊戲規則</span>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-grow">
+
+        <!-- ================= PAGE 01: 遊戲主畫面 ================= -->
+        <div id="pageMain" class="space-y-6">
+
+            <!-- Global Action Bar & Undo/Redo Controls -->
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-brand-purple/95 p-4 rounded-2xl border-2 border-brand-sage text-white shadow-xl">
+                <div class="flex items-center gap-2">
+                    <button onclick="undoAction()" id="btnUndo" class="bg-brand-cyan hover:bg-brand-lime text-brand-purple disabled:opacity-40 disabled:pointer-events-none px-4 py-2 rounded-xl font-black text-xs sm:text-sm shadow flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-rotate-left"></i> 撤回操作 (Undo)
+                    </button>
+                    <button onclick="redoAction()" id="btnRedo" class="bg-brand-cyan hover:bg-brand-lime text-brand-purple disabled:opacity-40 disabled:pointer-events-none px-4 py-2 rounded-xl font-black text-xs sm:text-sm shadow flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-rotate-right"></i> 復原操作 (Redo)
+                    </button>
+                </div>
+                
+                <!-- Game Status Banner -->
+                <div class="flex items-center gap-2 text-xs sm:text-sm font-bold bg-black/20 px-4 py-2 rounded-xl border border-white/10">
+                    <span class="text-brand-cyan"><i class="fa-solid fa-circle-info"></i> 目前狀態：</span>
+                    <span id="gameStatusText" class="text-brand-lime font-black">遊戲進行中</span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="openEditNamesModal()" class="bg-brand-purple border border-white/30 hover:bg-brand-dark-purple text-white px-3 py-2 rounded-xl font-bold text-xs shadow flex items-center gap-1 transition">
+                        <i class="fa-solid fa-user-pen"></i> 修改玩家名稱
+                    </button>
+                    <button onclick="confirmReset()" class="bg-brand-pink hover:bg-pink-600 text-white px-3 py-2 rounded-xl font-black text-xs shadow flex items-center gap-1 transition">
+                        <i class="fa-solid fa-arrows-rotate"></i> 重新開始遊戲
+                    </button>
+                </div>
+            </div>
+
+            <!-- Player Cards Grid (無頭像，精簡純淨設計) -->
+            <div id="playersGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Dynamic Player Cards Generated via JavaScript -->
+            </div>
+
+            <!-- Card Calculator & Action Section -->
+            <div class="main-wood-box rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6">
+                <div class="border-b-2 border-brand-sage/40 pb-3 flex flex-wrap justify-between items-center gap-2">
+                    <h2 class="text-xl sm:text-2xl font-black text-brand-purple flex items-center gap-2">
+                        <i class="fa-solid fa-calculator text-brand-pink"></i> 撲克數字牌資產計算與驗證
+                    </h2>
+                    <span class="text-xs font-bold text-brand-purple/70 bg-brand-cyan/20 px-3 py-1 rounded-full border border-brand-cyan/40">
+                        點擊打出實體數字牌，輸入結果後系統核對
+                    </span>
+                </div>
+
+                <form id="calculatorForm" onsubmit="handleCalculateSubmit(event)" class="space-y-5">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        
+                        <!-- 1. 出牌玩家 (即時點擊選取) -->
+                        <div class="space-y-1.5">
+                            <label class="text-xs font-black text-brand-purple flex items-center gap-1">
+                                <i class="fa-solid fa-user"></i> 1. 出牌玩家
+                            </label>
+                            <select id="selectActor" onchange="setCurrentActor(parseInt(this.value))" class="w-full bg-white border-2 border-brand-sage text-brand-purple font-bold text-sm rounded-xl p-2.5 focus:outline-none focus:border-brand-cyan">
+                                <!-- Options dynamically rendered -->
+                            </select>
+                        </div>
+
+                        <!-- 2. 撲克牌花色 (自動決定運算方式) -->
+                        <div class="space-y-1.5">
+                            <label class="text-xs font-black text-brand-purple flex items-center gap-1">
+                                <i class="fa-solid fa-clone"></i> 2. 撲克花色 (決定運算)
+                            </label>
+                            <select id="selectSuit" onchange="handleSuitChange()" class="w-full bg-white border-2 border-brand-sage text-brand-purple font-bold text-sm rounded-xl p-2.5 focus:outline-none focus:border-brand-cyan">
+                                <option value="hearts">♥️ 紅心（加法 ＋10萬/張）</option>
+                                <option value="diamonds">♦️ 菱形（乘法 ×數字）</option>
+                                <option value="clubs">♣️ 梅花（減法 －10萬/張）</option>
+                                <option value="spades">♠️ 黑桃（除法 ÷數字）</option>
+                            </select>
+                        </div>
+
+                        <!-- 3. 牌面數字 (1~10 或 2~10) -->
+                        <div class="space-y-1.5">
+                            <label class="text-xs font-black text-brand-purple flex items-center gap-1">
+                                <i class="fa-solid fa-hashtag"></i> 3. 牌面數字
+                            </label>
+                            <select id="selectCardValue" class="w-full bg-white border-2 border-brand-sage text-brand-purple font-bold text-sm rounded-xl p-2.5 focus:outline-none focus:border-brand-cyan">
+                                <!-- Options populated dynamically based on suit -->
+                            </select>
+                        </div>
+
+                        <!-- 4. 資產變動對象 -->
+                        <div class="space-y-1.5">
+                            <label class="text-xs font-black text-brand-purple flex items-center gap-1">
+                                <i class="fa-solid fa-bullseye"></i> 4. 變動對象
+                            </label>
+                            <select id="selectTarget" class="w-full bg-white border-2 border-brand-sage text-brand-purple font-bold text-sm rounded-xl p-2.5 focus:outline-none focus:border-brand-cyan">
+                                <!-- Options dynamically rendered -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Input Answer & Verify Area -->
+                    <div class="bg-brand-purple/5 p-4 rounded-2xl border-2 border-brand-sage/40 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                        <div class="flex-grow space-y-1">
+                            <label class="text-xs font-black text-brand-purple flex items-center gap-1">
+                                <i class="fa-solid fa-pen-to-square text-brand-pink"></i> 5. 你的計算答案（資產變動後數值，單位：萬）
+                            </label>
+                            <div class="flex items-center gap-2">
+                                <input type="number" id="inputUserAnswer" step="any" placeholder="請輸入算出的結果數字..." class="w-full bg-white border-2 border-brand-sage text-brand-purple font-black text-base rounded-xl p-3 focus:outline-none focus:border-brand-cyan shadow-inner">
+                                <span class="font-black text-brand-purple text-base">萬</span>
+                                
+                                <!-- 快捷直接標記破產按鈕 -->
+                                <button type="button" onclick="handleDirectBankrupt()" class="bg-brand-pink hover:bg-pink-600 text-white font-black px-4 py-3 rounded-xl text-xs whitespace-nowrap shadow hover-lift transition border border-white/20">
+                                    <i class="fa-solid fa-skull"></i> 宣告破產
+                                </button>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="sm:w-48 bg-brand-cyan hover:bg-brand-lime text-brand-purple font-black py-3.5 px-6 rounded-2xl text-base shadow-lg hover-lift transition border-2 border-white flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-check text-lg"></i> 送出
+                        </button>
+                    </div>
+
+                    <!-- 計算錯誤提示時顯示算式 (平時隱藏) -->
+                    <div id="equationHintBox" class="hidden bg-brand-pink/10 border-2 border-brand-pink/40 p-3 rounded-xl text-center">
+                        <p class="text-xs font-bold text-brand-pink">
+                            <i class="fa-solid fa-lightbulb"></i> 算式結構提示：
+                            <span id="equationHintText" class="font-black underline"></span>
+                        </p>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Quick Action Event Cards Shortcut Row (低飽和度與柔和淡雅色調：再降低40%飽和度) -->
+            <div id="eventCardsSectionBox" class="main-wood-box rounded-3xl p-5 sm:p-7 shadow-2xl space-y-4 bg-[#FAF9F5] border-[#9B8EB3]">
+                <div class="flex justify-between items-center border-b-2 border-brand-sage/40 pb-3">
+                    <h3 class="text-lg font-black text-[#5C5078] flex items-center gap-2">
+                        <i class="fa-solid fa-bolt text-[#A3B377]"></i> 事件卡快速打出發動
+                    </h3>
+                    <button onclick="switchPage('cards')" class="text-xs font-bold text-[#5C5078] hover:underline">查看圖鑑細節 &rarr;</button>
+                </div>
+                
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-3 items-stretch">
+                    <!-- 黑色 J/Q/K：淡紫色 (#8C81A6) -->
+                    <button onclick="triggerBlackJ()" class="bg-[#8C81A6] hover:bg-[#786D91] text-[#E3FCF8] p-3 rounded-2xl border-2 border-white/40 font-bold text-xs flex flex-col items-center justify-center gap-1 hover-lift shadow h-full min-h-[72px]">
+                        <span class="font-black text-[#32264D]">黑色 J</span>
+                        <span class="text-[10px] text-white/90 font-normal">J富濟貧</span>
+                    </button>
+                    <button onclick="triggerBlackQ()" class="bg-[#8C81A6] hover:bg-[#786D91] text-[#E3FCF8] p-3 rounded-2xl border-2 border-white/40 font-bold text-xs flex flex-col items-center justify-center gap-1 hover-lift shadow h-full min-h-[72px]">
+                        <span class="font-black text-[#32264D]">黑色 Q</span>
+                        <span class="text-[10px] text-white/90 font-normal">同生共死</span>
+                    </button>
+                    <button onclick="triggerBlackK()" class="bg-[#8C81A6] hover:bg-[#786D91] text-[#E3FCF8] p-3 rounded-2xl border-2 border-white/40 font-bold text-xs flex flex-col items-center justify-center gap-1 hover-lift shadow h-full min-h-[72px]">
+                        <span class="font-black text-[#32264D]">黑色 K</span>
+                        <span class="text-[10px] text-white/90 font-normal">俺是皇上</span>
+                    </button>
+                    <!-- 紅色 J/Q/K：柔和淡粉紅 (#DB90A6) -->
+                    <button onclick="openRedJModal()" class="bg-[#DB90A6] hover:bg-[#C97B92] text-white p-3 rounded-2xl border-2 border-white/40 font-bold text-xs flex flex-col items-center justify-center gap-1 hover-lift shadow h-full min-h-[72px]">
+                        <span class="font-black text-[#521C2C]">紅色 J</span>
+                        <span class="text-[10px] text-white/90 font-normal">是個善人</span>
+                    </button>
+                    <button onclick="triggerRedQ()" class="bg-[#DB90A6] hover:bg-[#C97B92] text-white p-3 rounded-2xl border-2 border-white/40 font-bold text-xs flex flex-col items-center justify-center gap-1 hover-lift shadow h-full min-h-[72px]">
+                        <span class="font-black text-[#521C2C]">紅色 Q</span>
+                        <span class="text-[10px] text-white/90 font-normal">窮途末路</span>
+                    </button>
+                    <button onclick="openRedKModal()" class="bg-[#DB90A6] hover:bg-[#C97B92] text-white p-3 rounded-2xl border-2 border-white/40 font-bold text-xs flex flex-col items-center justify-center gap-1 hover-lift shadow h-full min-h-[72px]">
+                        <span class="font-black text-[#521C2C]">紅色 K</span>
+                        <span class="text-[10px] text-white/90 font-normal">王從天降</span>
+                    </button>
+                    <!-- Joker 大赦天下：柔和淡藍綠 (#8BB5BD) -->
+                    <button onclick="triggerJoker()" class="bg-[#8BB5BD] hover:bg-[#75A1A9] text-[#EDFCF9] p-3 rounded-2xl border-2 border-white/40 font-bold text-xs flex flex-col items-center justify-center gap-1 hover-lift shadow h-full min-h-[72px]">
+                        <span class="font-black text-[#1E3B42]">Joker</span>
+                        <span class="text-[10px] text-white/90 font-normal">大赦天下</span>
+                    </button>
+                    <!-- 菱形 1 絕對菱度：低飽和淡灰綠 (#9BB5AE) -->
+                    <button onclick="openDiamond1Modal()" class="bg-[#9BB5AE] hover:bg-[#85A19A] text-white p-3 rounded-2xl border-2 border-white/40 font-bold text-xs flex flex-col items-center justify-center gap-1 hover-lift shadow h-full min-h-[72px]">
+                        <span class="font-black text-[#223E37]">菱形 1</span>
+                        <span class="text-[10px] text-white/90 font-normal">絕對菱度</span>
+                    </button>
+                    <!-- 黑桃 1 桃之夭夭：與菱形1完全相同淡灰綠 (#9BB5AE) -->
+                    <button onclick="openSpade1Modal()" class="bg-[#9BB5AE] hover:bg-[#85A19A] text-white p-3 rounded-2xl border-2 border-white/40 font-bold text-xs flex flex-col items-center justify-center gap-1 hover-lift shadow h-full min-h-[72px] col-span-2 sm:col-span-1 lg:col-span-1">
+                        <span class="font-black text-[#223E37]">黑桃 1</span>
+                        <span class="text-[10px] text-white/90 font-normal">桃之夭夭</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- History Logs Section -->
+            <div class="main-wood-box rounded-3xl p-5 sm:p-7 shadow-2xl space-y-4">
+                <div class="flex justify-between items-center border-b-2 border-brand-sage/40 pb-3">
+                    <h3 class="text-lg font-black text-brand-purple flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-brand-cyan"></i> 完整的資產變動紀錄對照表
+                    </h3>
+                    <span class="text-xs text-brand-purple/70 font-bold">隨時核對歷史出牌</span>
+                </div>
+                <div class="overflow-x-auto rounded-2xl border-2 border-brand-sage/40">
+                    <table class="w-full text-left text-xs sm:text-sm text-brand-purple border-collapse">
+                        <thead class="bg-brand-purple text-white font-black border-b border-brand-sage">
+                            <tr>
+                                <th class="p-3">時間</th>
+                                <th class="p-3">操作玩家</th>
+                                <th class="p-3">對象玩家</th>
+                                <th class="p-3">打出卡牌/事件</th>
+                                <th class="p-3">資產變動前</th>
+                                <th class="p-3">變動數值</th>
+                                <th class="p-3">資產變動後</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyLogTable" class="divide-y divide-brand-sage/30 bg-white font-medium">
+                            <!-- Dynamic log rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ================= PAGE 02: 事件卡圖鑑 ================= -->
+        <div id="pageCards" class="hidden space-y-6">
+            <div class="main-wood-box rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 bg-[#FAF9F5] border-[#9B8EB3]">
+                <div class="text-center border-b-2 border-brand-sage/40 pb-4">
+                    <h2 class="text-2xl sm:text-3xl font-black text-[#5C5078] flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-cards text-[#A3B377]"></i> 事件卡圖鑑大全
+                    </h2>
+                    <p class="text-xs sm:text-sm text-[#5C5078]/80 font-medium mt-1">點選下方任何一張卡片，即可開啟檢視完整原版說明與使用規範。</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- 黑色 J -->
+                    <div onclick="showCardDetail('blackJ')" class="bg-[#8C81A6] text-white rounded-3xl p-6 border-4 border-white/30 shadow-xl cursor-pointer hover-lift space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xl font-black text-[#2D2147]">黑色 J</span>
+                            <span class="text-xs bg-[#786D91] text-[#E3FCF8] px-2.5 py-1 rounded-full border border-white/20">事件卡</span>
+                        </div>
+                        <h3 class="text-2xl font-black text-[#2D2147]">J 富濟貧</h3>
+                        <p class="text-xs text-white/90 line-clamp-2">將資產最多的玩家資產減半，減少的資產平均轉給已破產的玩家...</p>
+                        <div class="text-right text-xs text-[#E3FCF8] font-bold">點擊查看完整說明 &rarr;</div>
+                    </div>
+
+                    <!-- 黑色 Q -->
+                    <div onclick="showCardDetail('blackQ')" class="bg-[#8C81A6] text-white rounded-3xl p-6 border-4 border-white/30 shadow-xl cursor-pointer hover-lift space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xl font-black text-[#2D2147]">黑色 Q</span>
+                            <span class="text-xs bg-[#786D91] text-[#E3FCF8] px-2.5 py-1 rounded-full border border-white/20">事件卡</span>
+                        </div>
+                        <h3 class="text-2xl font-black text-[#2D2147]">同生共死</h3>
+                        <p class="text-xs text-white/90 line-clamp-2">收集所有未破產玩家的資產，再平均分配給所有未破產玩家...</p>
+                        <div class="text-right text-xs text-[#E3FCF8] font-bold">點擊查看完整說明 &rarr;</div>
+                    </div>
+
+                    <!-- 黑色 K -->
+                    <div onclick="showCardDetail('blackK')" class="bg-[#8C81A6] text-white rounded-3xl p-6 border-4 border-white/30 shadow-xl cursor-pointer hover-lift space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xl font-black text-[#2D2147]">黑色 K</span>
+                            <span class="text-xs bg-[#786D91] text-[#E3FCF8] px-2.5 py-1 rounded-full border border-white/20">事件卡</span>
+                        </div>
+                        <h3 class="text-2xl font-black text-[#2D2147]">俺是皇上</h3>
+                        <p class="text-xs text-white/90 line-clamp-2">使用此卡後，玩家可以立即再進行一次行動。此卡本身不計入行動次數...</p>
+                        <div class="text-right text-xs text-[#E3FCF8] font-bold">點擊查看完整說明 &rarr;</div>
+                    </div>
+
+                    <!-- 紅色 J -->
+                    <div onclick="showCardDetail('redJ')" class="bg-[#DB90A6] text-white rounded-3xl p-6 border-4 border-white/30 shadow-xl cursor-pointer hover-lift space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xl font-black text-[#4D1525]">紅色 J</span>
+                            <span class="text-xs bg-[#C97B92] text-white px-2.5 py-1 rounded-full border border-white/20">事件卡</span>
+                        </div>
+                        <h3 class="text-2xl font-black text-[#4D1525]">是個善人</h3>
+                        <p class="text-xs text-white/90 line-clamp-2">玩家可以選擇最窮的玩家（包含已破產玩家），捐贈100萬...</p>
+                        <div class="text-right text-xs text-amber-100 font-bold">點擊查看完整說明 &rarr;</div>
+                    </div>
+
+                    <!-- 紅色 Q -->
+                    <div onclick="showCardDetail('redQ')" class="bg-[#DB90A6] text-white rounded-3xl p-6 border-4 border-white/30 shadow-xl cursor-pointer hover-lift space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xl font-black text-[#4D1525]">紅色 Q</span>
+                            <span class="text-xs bg-[#C97B92] text-white px-2.5 py-1 rounded-full border border-white/20">事件卡</span>
+                        </div>
+                        <h3 class="text-2xl font-black text-[#4D1525]">窮途末路</h3>
+                        <p class="text-xs text-white/90 line-clamp-2">所有玩家的資產一律減少40萬...</p>
+                        <div class="text-right text-xs text-amber-100 font-bold">點擊查看完整說明 &rarr;</div>
+                    </div>
+
+                    <!-- 紅色 K -->
+                    <div onclick="showCardDetail('redK')" class="bg-[#DB90A6] text-white rounded-3xl p-6 border-4 border-white/30 shadow-xl cursor-pointer hover-lift space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xl font-black text-[#4D1525]">紅色 K</span>
+                            <span class="text-xs bg-[#C97B92] text-white px-2.5 py-1 rounded-full border border-white/20">事件卡</span>
+                        </div>
+                        <h3 class="text-2xl font-black text-[#4D1525]">王從天降</h3>
+                        <p class="text-xs text-white/90 line-clamp-2">玩家抽到此牌後，若用力打出此牌並大聲喊出『王從天降』，即可抽取指定玩家的一張手牌...</p>
+                        <div class="text-right text-xs text-amber-100 font-bold">點擊查看完整說明 &rarr;</div>
+                    </div>
+
+                    <!-- Joker 大赦天下：底色同步為柔和淡藍綠 (#8BB5BD) -->
+                    <div onclick="showCardDetail('joker')" class="bg-[#8BB5BD] text-white rounded-3xl p-6 border-4 border-white/30 shadow-xl cursor-pointer hover-lift space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xl font-black text-[#19353C]">Joker</span>
+                            <span class="text-xs bg-[#75A1A9] text-[#EDFCF9] px-2.5 py-1 rounded-full border border-white/20">特殊事件卡</span>
+                        </div>
+                        <h3 class="text-2xl font-black text-[#19353C]">大赦天下</h3>
+                        <p class="text-xs text-white/90 line-clamp-2">所有已破產玩家恢復資產，並將資產設定為300萬。抽到此牌時必須立即使用...</p>
+                        <div class="text-right text-xs text-[#EDFCF9] font-bold">點擊查看完整說明 &rarr;</div>
+                    </div>
+
+                    <!-- 菱形 1 絕對菱度：底色為低飽和淡灰綠 (#9BB5AE) -->
+                    <div onclick="showCardDetail('diamond1')" class="bg-[#9BB5AE] text-white rounded-3xl p-6 border-4 border-white/30 shadow-xl cursor-pointer hover-lift space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xl font-black text-[#1E3832]">菱形 1</span>
+                            <span class="text-xs bg-[#85A19A] text-[#E8FAF6] px-2.5 py-1 rounded-full border border-white/20">功能事件卡</span>
+                        </div>
+                        <h3 class="text-2xl font-black text-[#1E3832]">絕對菱度</h3>
+                        <p class="text-xs text-white/90 line-clamp-2">凍結指定一位玩家的資產，當回合任何玩家都無法變動他的資產（含出牌玩家自己）...</p>
+                        <div class="text-right text-xs text-[#E8FAF6] font-bold">點擊查看完整說明 &rarr;</div>
+                    </div>
+
+                    <!-- 黑桃 1 桃之夭夭：底色同步為與菱形1完全相同的 (#9BB5AE) -->
+                    <div onclick="showCardDetail('spade1')" class="bg-[#9BB5AE] text-white rounded-3xl p-6 border-4 border-white/30 shadow-xl cursor-pointer hover-lift space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xl font-black text-[#1E3832]">黑桃 1</span>
+                            <span class="text-xs bg-[#85A19A] text-[#E8FAF6] px-2.5 py-1 rounded-full border border-white/20">BUFF事件卡</span>
+                        </div>
+                        <h3 class="text-2xl font-black text-[#1E3832]">桃之夭夭</h3>
+                        <p class="text-xs text-white/90 line-clamp-2">BUFF牌，打出後若後續有玩家想變動自己的資產時，自動抵擋一次，抵擋後BUFF消除...</p>
+                        <div class="text-right text-xs text-[#E8FAF6] font-bold">點擊查看完整說明 &rarr;</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= PAGE 03: 遊戲規則 ================= -->
+        <div id="pageRules" class="hidden space-y-6">
+            <div class="main-wood-box rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 bg-white">
+                <div class="border-b-2 border-brand-sage/40 pb-4">
+                    <h2 class="text-2xl sm:text-3xl font-black text-brand-purple flex items-center gap-2">
+                        <i class="fa-solid fa-scroll text-brand-pink"></i> 超級資本家・實體桌遊與輔助規則
+                    </h2>
+                    <p class="text-xs sm:text-sm text-brand-purple/70 font-bold mt-1">輔助網頁負責數值紀錄、算術比對驗證與條件自動判定。</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-brand-purple">
+                    <div class="space-y-3 bg-brand-cream p-5 rounded-2xl border border-brand-sage/40">
+                        <h3 class="font-black text-base text-brand-purple flex items-center gap-2">
+                            <i class="fa-solid fa-gamepad text-brand-cyan"></i> 一、遊戲基本流程與設定
+                        </h3>
+                        <ul class="list-disc list-inside space-y-1.5 text-xs sm:text-sm font-medium">
+                            <li>每位玩家初始資產為 <span class="font-black text-brand-pink">10 萬</span>。</li>
+                            <li>開局系統自動隨機抽籤決定 4 位玩家的輪流順序。</li>
+                            <li>每位玩家初始抽取 5 張實體撲克牌。</li>
+                            <li>每回合輪到自己時，可以選擇抽取 1 張牌或打出 1 張牌。</li>
+                            <li>每位玩家每局最多被攻擊 2 次。</li>
+                            <li>抽到的事件卡只能在下一回合使用；Joker「大赦天下」必須抽到後立即使用。</li>
+                        </ul>
+                    </div>
+
+                    <div class="space-y-3 bg-brand-cream p-5 rounded-2xl border border-brand-sage/40">
+                        <h3 class="font-black text-base text-brand-purple flex items-center gap-2">
+                            <i class="fa-solid fa-calculator text-brand-pink"></i> 二、撲克牌花色與運算規則
+                        </h3>
+                        <ul class="list-disc list-inside space-y-1.5 text-xs sm:text-sm font-medium">
+                            <li><span class="font-black text-red-600">♥️ 紅心</span>：加法（＋），基本單位 10萬/數字 (牌面 1~10)。</li>
+                            <li><span class="font-black text-red-600">♦️ 菱形</span>：乘法（×），倍率即為牌面數字 (牌面 2~10)。</li>
+                            <li><span class="font-black text-gray-800">♣️ 梅花</span>：減法（－），基本單位 10萬/數字 (牌面 1~10)。</li>
+                            <li><span class="font-black text-gray-800">♠️ 黑桃</span>：除法（÷），除數即為牌面數字 (牌面 2~10)。</li>
+                        </ul>
+                    </div>
+
+                    <div class="space-y-3 bg-brand-cream p-5 rounded-2xl border border-brand-sage/40 md:col-span-2">
+                        <h3 class="font-black text-base text-brand-purple flex items-center gap-2">
+                            <i class="fa-solid fa-trophy text-brand-lime"></i> 三、遊戲自動判定勝負與淘汰條件
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
+                            <div class="bg-white p-3.5 rounded-xl border border-brand-sage/30">
+                                <span class="font-black text-brand-purple">1. 一般勝利條件：</span><br>
+                                玩家資產超過 500 萬，並完成相關條件判定即可獲勝。
+                            </div>
+                            <div class="bg-white p-3.5 rounded-xl border border-brand-sage/30">
+                                <span class="font-black text-brand-purple">2. 特殊直接勝利：</span><br>
+                                若其他所有玩家皆破產（資產 &lt; 0萬），而自己的資產超過 400 萬，直接獲勝。
+                            </div>
+                            <div class="bg-white p-3.5 rounded-xl border border-brand-sage/30">
+                                <span class="font-black text-brand-purple">3. 資產修正條件：</span><br>
+                                若自己資產 &gt; 500萬，而其他玩家資產皆介於 400萬~500萬，自己資產直接修正為 <span class="font-black text-brand-pink">300萬</span>，並重新判定。
+                            </div>
+                            <div class="bg-white p-3.5 rounded-xl border border-brand-sage/30">
+                                <span class="font-black text-brand-purple">4. 淘汰與破產條件：</span><br>
+                                自己資產 0~400萬且其他玩家皆破產時被淘汰；資產低於 0 萬直接標記已破產。全員破產則無人獲勝。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="text-center text-xs text-white/70 py-4 font-bold">
+        超級資本家桌遊輔助系統 &copy; 2026 | 專為國小中年級設計之數學計算與輔助判定工具
+    </footer>
+
+    <!-- MODAL DIALOGS -->
+
+    <!-- Modal 1: 玩家名稱開局設定 Modal (僅在開局或全新重新開始時出現) -->
+    <div id="playerSetupModal" class="fixed inset-0 modal-bg z-50 flex items-center justify-center p-4">
+        <div class="main-wood-box rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div class="text-center border-b-2 border-brand-sage/40 pb-3">
+                <h3 class="text-2xl font-black text-brand-purple flex items-center justify-center gap-2">
+                    👑 超級資本家・玩家設定
+                </h3>
+                <p class="text-xs text-brand-purple/70 font-bold mt-1">請輸入四位玩家姓名，進入遊戲將自動抽籤決定順序</p>
+            </div>
+            
+            <form onsubmit="savePlayerNames(event)" class="space-y-3">
+                <div class="space-y-2">
+                    <label class="text-xs font-black text-brand-purple flex items-center gap-1">玩家 P1 名稱</label>
+                    <input type="text" id="inputP0" value="玩家 1" required class="w-full bg-white border-2 border-brand-sage p-2.5 rounded-xl font-bold text-sm text-brand-purple focus:outline-none focus:border-brand-cyan">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs font-black text-brand-purple flex items-center gap-1">玩家 P2 名稱</label>
+                    <input type="text" id="inputP1" value="玩家 2" required class="w-full bg-white border-2 border-brand-sage p-2.5 rounded-xl font-bold text-sm text-brand-purple focus:outline-none focus:border-brand-cyan">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs font-black text-brand-purple flex items-center gap-1">玩家 P3 名稱</label>
+                    <input type="text" id="inputP2" value="玩家 3" required class="w-full bg-white border-2 border-brand-sage p-2.5 rounded-xl font-bold text-sm text-brand-purple focus:outline-none focus:border-brand-cyan">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs font-black text-brand-purple flex items-center gap-1">玩家 P4 名稱</label>
+                    <input type="text" id="inputP3" value="玩家 4" required class="w-full bg-white border-2 border-brand-sage p-2.5 rounded-xl font-bold text-sm text-brand-purple focus:outline-none focus:border-brand-cyan">
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="w-full bg-brand-cyan hover:bg-brand-lime text-brand-purple font-black py-3 rounded-2xl text-base shadow-lg hover-lift transition border-2 border-white flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play"></i> 隨機抽籤順序並開始遊戲
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 1.5: 修改玩家名稱專用 Modal (不重置遊戲進度、不重啟遊戲) -->
+    <div id="editNamesOnlyModal" class="fixed inset-0 modal-bg z-50 flex items-center justify-center p-4 hidden">
+        <div class="main-wood-box rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div class="text-center border-b-2 border-brand-sage/40 pb-3">
+                <h3 class="text-xl font-black text-brand-purple flex items-center justify-center gap-2">
+                    ✏️ 修改玩家名稱
+                </h3>
+                <p class="text-xs text-brand-purple/70 font-bold mt-1">更新名稱後保留目前的遊戲資產、回合與所有進度</p>
+            </div>
+            
+            <form onsubmit="saveEditedNamesOnly(event)" class="space-y-3">
+                <div class="space-y-1.5">
+                    <label class="text-xs font-black text-brand-purple">P1 玩家名稱</label>
+                    <input type="text" id="editP0" required class="w-full bg-white border-2 border-brand-sage p-2.5 rounded-xl font-bold text-sm text-brand-purple focus:outline-none focus:border-brand-cyan">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="text-xs font-black text-brand-purple">P2 玩家名稱</label>
+                    <input type="text" id="editP1" required class="w-full bg-white border-2 border-brand-sage p-2.5 rounded-xl font-bold text-sm text-brand-purple focus:outline-none focus:border-brand-cyan">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="text-xs font-black text-brand-purple">P3 玩家名稱</label>
+                    <input type="text" id="editP2" required class="w-full bg-white border-2 border-brand-sage p-2.5 rounded-xl font-bold text-sm text-brand-purple focus:outline-none focus:border-brand-cyan">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="text-xs font-black text-brand-purple">P4 玩家名稱</label>
+                    <input type="text" id="editP3" required class="w-full bg-white border-2 border-brand-sage p-2.5 rounded-xl font-bold text-sm text-brand-purple focus:outline-none focus:border-brand-cyan">
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="button" onclick="closeModal('editNamesOnlyModal')" class="w-1/2 bg-gray-200 hover:bg-gray-300 text-brand-purple font-bold py-2.5 rounded-xl text-sm">取消</button>
+                    <button type="submit" class="w-1/2 bg-brand-cyan hover:bg-brand-lime text-brand-purple font-black py-2.5 rounded-xl text-sm shadow border border-white">儲存新名稱</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: 紅色 J「是個善人」互動視窗 -->
+    <div id="redJModal" class="fixed inset-0 modal-bg z-50 flex items-center justify-center p-4 hidden">
+        <div class="main-wood-box rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div class="text-center border-b-2 border-brand-sage/40 pb-3">
+                <h3 class="text-xl font-black text-brand-purple">紅色 J｜是個善人</h3>
+                <p class="text-xs text-brand-purple/80 font-bold mt-1">選擇受贈的對象（選擇最窮或破產的玩家）捐贈 100 萬</p>
+            </div>
+            <div class="space-y-3">
+                <label class="text-xs font-black text-brand-purple">請選擇捐贈目標玩家：</label>
+                <select id="selectRedJTarget" class="w-full bg-white border-2 border-brand-sage p-2.5 rounded-xl font-bold text-sm text-brand-purple"></select>
+                <p class="text-[11px] text-brand-pink font-bold">※ 警告：若捐贈者自己的資產少於 100 萬，發動後將直接宣告破產！</p>
+            </div>
+            <div class="flex items-center gap-2 pt-2">
+                <button onclick="closeModal('redJModal')" class="w-1/2 bg-gray-200 hover:bg-gray-300 text-brand-purple font-bold py-2.5 rounded-xl text-sm">取消</button>
+                <button onclick="executeRedJ()" class="w-1/2 bg-brand-pink hover:bg-pink-600 text-white font-black py-2.5 rounded-xl text-sm shadow">發動善人捐贈</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 3: 紅色 K「王從天降」互動視窗 -->
+    <div id="redKModal" class="fixed inset-0 modal-bg z-50 flex items-center justify-center p-4 hidden">
+        <div class="main-wood-box rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="text-center border-b-2 border-brand-sage/40 pb-3">
+                <h3 class="text-xl font-black text-brand-purple">紅色 K｜王從天降</h3>
+                <p class="text-xs text-brand-purple/80 font-bold mt-1">搶先喊出「王從天降」的玩家可抽取目標一張手牌</p>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs font-black text-brand-purple">1. 誰第一位喊出並使用了此牌？</label>
+                    <select id="selectRedKUser" class="w-full bg-white border-2 border-brand-sage p-2 rounded-xl font-bold text-sm text-brand-purple mt-1"></select>
+                </div>
+                <div>
+                    <label class="text-xs font-black text-brand-purple">2. 誰被抽取了一張手牌？</label>
+                    <select id="selectRedKVictim" class="w-full bg-white border-2 border-brand-sage p-2 rounded-xl font-bold text-sm text-brand-purple mt-1"></select>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 pt-2">
+                <button onclick="closeModal('redKModal')" class="w-1/2 bg-gray-200 hover:bg-gray-300 text-brand-purple font-bold py-2.5 rounded-xl text-sm">取消</button>
+                <button onclick="executeRedK()" class="w-1/2 bg-brand-cyan hover:bg-brand-lime text-brand-purple font-black py-2.5 rounded-xl text-sm shadow">完成操作紀錄</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 4: 菱形 1「絕對菱度」互動視窗 -->
+    <div id="diamond1Modal" class="fixed inset-0 modal-bg z-50 flex items-center justify-center p-4 hidden">
+        <div class="main-wood-box rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="text-center border-b-2 border-brand-sage/40 pb-3">
+                <h3 class="text-xl font-black text-brand-purple">菱形 1｜絕對菱度</h3>
+                <p class="text-xs text-brand-purple/80 font-bold mt-1">凍結指定一位玩家，當回合任何人都無法變動其資產</p>
+            </div>
+            <div class="space-y-3">
+                <label class="text-xs font-black text-brand-purple">請選擇要施加結冰凍結的玩家：</label>
+                <select id="selectDiamond1Target" class="w-full bg-white border-2 border-brand-sage p-2.5 rounded-xl font-bold text-sm text-brand-purple"></select>
+            </div>
+            <div class="flex items-center gap-2 pt-2">
+                <button onclick="closeModal('diamond1Modal')" class="w-1/2 bg-gray-200 hover:bg-gray-300 text-brand-purple font-bold py-2.5 rounded-xl text-sm">取消</button>
+                <button onclick="executeDiamond1()" class="w-1/2 bg-brand-cyan hover:bg-brand-lime text-brand-purple font-black py-2.5 rounded-xl text-sm shadow">發動資產凍結</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 5: 黑桃 1「桃之夭夭」互動視窗 -->
+    <div id="spade1Modal" class="fixed inset-0 modal-bg z-50 flex items-center justify-center p-4 hidden">
+        <div class="main-wood-box rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="text-center border-b-2 border-brand-sage/40 pb-3">
+                <h3 class="text-xl font-black text-brand-purple">黑桃 1｜桃之夭夭</h3>
+                <p class="text-xs text-brand-purple/80 font-bold mt-1">給予一位玩家 BUFF 護盾，自動抵擋一次後續資產攻擊/變動</p>
+            </div>
+            <div class="space-y-3">
+                <label class="text-xs font-black text-brand-purple">請選擇獲得護盾 BUFF 的玩家：</label>
+                <select id="selectSpade1Target" class="w-full bg-white border-2 border-brand-sage p-2.5 rounded-xl font-bold text-sm text-brand-purple"></select>
+            </div>
+            <div class="flex items-center gap-2 pt-2">
+                <button onclick="closeModal('spade1Modal')" class="w-1/2 bg-gray-200 hover:bg-gray-300 text-brand-purple font-bold py-2.5 rounded-xl text-sm">取消</button>
+                <button onclick="executeSpade1()" class="w-1/2 bg-brand-cyan hover:bg-brand-lime text-brand-purple font-black py-2.5 rounded-xl text-sm shadow">賦予護盾 BUFF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 6: 事件卡詳細圖鑑檢視 Modal -->
+    <div id="cardDetailModal" class="fixed inset-0 modal-bg z-50 flex items-center justify-center p-4 hidden">
+        <div class="main-wood-box rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b-2 border-brand-sage/40 pb-3">
+                <span id="cardDetailSuit" class="text-sm font-black text-brand-cyan bg-brand-purple px-3 py-1 rounded-full"></span>
+                <button onclick="closeModal('cardDetailModal')" class="text-brand-purple hover:text-brand-pink text-xl font-bold"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <h3 id="cardDetailTitle" class="text-2xl font-black text-brand-purple"></h3>
+            <div class="bg-brand-cream p-4 rounded-2xl border border-brand-sage/40">
+                <p id="cardDetailText" class="text-sm text-brand-purple leading-relaxed font-medium whitespace-pre-line"></p>
+            </div>
+            <button onclick="closeModal('cardDetailModal')" class="w-full bg-brand-purple text-white font-bold py-2.5 rounded-xl text-sm">關閉說明視窗</button>
+        </div>
+    </div>
+
+    <!-- Modal 7: 遊戲結局與勝負彈窗 -->
+    <div id="gameEndingModal" class="fixed inset-0 modal-bg z-50 flex items-center justify-center p-4 hidden">
+        <div id="endingCardWrapper" class="main-wood-box rounded-3xl max-w-md w-full p-6 text-center space-y-5 shadow-2xl transition-all">
+            <div id="endingIconContainer" class="text-6xl text-brand-lime">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div>
+                <h2 id="endingTitle" class="text-2xl font-black text-brand-purple">恭喜獲勝！</h2>
+                <p id="endingSubtitle" class="text-xs sm:text-sm text-brand-purple/80 font-bold mt-1">恭喜成為超級資本家！</p>
+            </div>
+            <div id="endingDetails" class="bg-brand-cream p-4 rounded-2xl border border-brand-sage/40 text-xs text-brand-purple space-y-1 font-medium">
+            </div>
+            <button onclick="confirmReset()" class="w-full bg-brand-purple hover:bg-brand-dark-purple text-brand-cyan font-black py-3 rounded-xl text-base shadow-xl hover-lift transition">
+                <i class="fa-solid fa-arrows-rotate"></i> 重新開始遊戲
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal 8: 提示/警告 Alert Modal (純警告訊息，絕對不使用原生 alert()) -->
+    <div id="alertModal" class="fixed inset-0 modal-bg z-50 flex items-center justify-center p-4 hidden">
+        <div class="main-wood-box rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+            <div id="alertIcon" class="text-4xl text-brand-pink">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 id="alertTitle" class="text-lg font-black text-brand-purple">計算結果不正確</h3>
+            <p id="alertMessage" class="text-xs text-brand-purple/80 font-bold"></p>
+            <button onclick="closeModal('alertModal')" class="w-full bg-brand-pink text-white font-black py-2.5 rounded-xl text-sm shadow">確定</button>
+        </div>
+    </div>
+
+
+    <!-- ================= JAVASCRIPT SYSTEM ENGINE ================= -->
+    <script>
+        // 核心狀態 Core Game State
+        let gameState = {
+            players: [
+                { id: 0, name: '玩家 1', asset: 10, isFrozen: false, hasBuff: false },
+                { id: 1, name: '玩家 2', asset: 10, isFrozen: false, hasBuff: false },
+                { id: 2, name: '玩家 3', asset: 10, isFrozen: false, hasBuff: false },
+                { id: 3, name: '玩家 4', asset: 10, isFrozen: false, hasBuff: false }
+            ],
+            turnOrder: [0, 1, 2, 3], // 隨機抽籤後的輪流順序
+            currentTurnIndex: 0,      // 目前順位 Index
+            status: 'GAME_ON',        // GAME_ON, WINNER, ALL_BANKRUPT
+            statusMessage: '遊戲進行中',
+            statusReason: '請輸入實體撲克牌紀錄，或執行事件卡進行資產計算與勝負判定。'
+        };
+
+        // 隨機產生 0~3 的不重複玩家輪流順序
+        function shuffleTurnOrder() {
+            const array = [0, 1, 2, 3];
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // 撤回 (Undo) & 復原 (Redo) 堆疊
+        let undoStack = [];
+        let redoStack = [];
+
+        // 記錄上一幀呈現的資產數值 (做碼表式滾動計數器動畫)
+        let displayedAssets = [10, 10, 10, 10];
+        let historyLogs = [];
+        let isEndingShown = false;
+
+        // 事件卡原版說明文字對照表
+        const CARD_DESCRIPTIONS = {
+            blackJ: {
+                suit: "黑色 J",
+                title: "J富濟貧",
+                text: "「劫富濟貧：將資產最多的玩家資產減半，減少的資產平均轉給已破產的玩家。若有多位資產最多的玩家，以猜拳決定。若有多位破產玩家，以猜拳決定分配對象。若沒有破產玩家，不能使用此卡。」"
+            },
+            blackQ: {
+                suit: "黑色 Q",
+                title: "同生共死",
+                text: "「同生共死：收集所有未破產玩家的資產，再平均分配給所有未破產玩家。已破產玩家不參與分配，負數資產不列入計算。」"
+            },
+            blackK: {
+                suit: "黑色 K",
+                title: "俺是皇上",
+                text: "「俺是皇上：使用此卡後，玩家可以立即再進行一次行動。此卡本身不計入行動次數。」"
+            },
+            redJ: {
+                suit: "紅色 J",
+                title: "是個善人",
+                text: "「是個善人：玩家可以選擇最窮的玩家（包含已破產玩家），捐贈100萬。若捐贈者自己的資產少於100萬，則直接破產。」"
+            },
+            redQ: {
+                suit: "紅色 Q",
+                title: "窮途末路",
+                text: "「窮途末路：所有玩家的資產一律減少40萬。」"
+            },
+            redK: {
+                suit: "紅色 K",
+                title: "王從天降",
+                text: "「王從天降：玩家抽到此牌後，若用力打出此牌並大聲喊出『王從天降』，即可抽取指定玩家的一張手牌。若抽到後沒有立即執行，則將此牌亮給所有玩家。第一位喊出『王從天降』的玩家即可使用此牌。」"
+            },
+            joker: {
+                suit: "Joker",
+                title: "大赦天下",
+                text: "「大赦天下：所有已破產玩家恢復資產，並將資產設定為300萬。抽到此牌時必須立即使用。使用此卡不計入行動次數。」"
+            },
+            diamond1: {
+                suit: "菱形 1",
+                title: "絕對菱度",
+                text: "「絕對菱度：凍結指定一位玩家的資產，當回合任何玩家都無法變動他的資產（含出牌玩家自己）。」"
+            },
+            spade1: {
+                suit: "黑桃 1",
+                title: "桃之夭夭",
+                text: "「桃之夭夭：BUFF牌，打出後若後續有玩家想變動自己的資產時，自動抵擋一次，抵擋後BUFF消除。」"
+            }
+        };
+
+        // 頁面初始化
+        window.onload = function() {
+            handleSuitChange(); // 設定初始撲克數字選項
+            updateUI();
+        };
+
+        // Helper: 關閉所有目前開啟中的視窗
+        function closeAllModals() {
+            const modalIds = [
+                'playerSetupModal', 'editNamesOnlyModal', 'redJModal', 'redKModal', 
+                'diamond1Modal', 'spade1Modal', 'cardDetailModal', 
+                'alertModal', 'gameEndingModal'
+            ];
+            modalIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            });
+        }
+
+        // 開局設定 Modal (開啟全新對局)
+        function openPlayerSetupModal() {
+            for (let i = 0; i < 4; i++) {
+                document.getElementById(`inputP${i}`).value = gameState.players[i].name;
+            }
+            document.getElementById('playerSetupModal').classList.remove('hidden');
+        }
+
+        // 僅修改玩家名稱 Modal (即時更新名稱，不重置對局與進度)
+        function openEditNamesModal() {
+            for (let i = 0; i < 4; i++) {
+                document.getElementById(`editP${i}`).value = gameState.players[i].name;
+            }
+            document.getElementById('editNamesOnlyModal').classList.remove('hidden');
+        }
+
+        function saveEditedNamesOnly(e) {
+            e.preventDefault();
+            saveSnapshot(); // 保存 Snapshot 以供撤回/復原
+            
+            const nameChanges = [];
+            for (let i = 0; i < 4; i++) {
+                const oldName = gameState.players[i].name;
+                const newName = document.getElementById(`editP${i}`).value.trim() || `玩家 ${i + 1}`;
+                if (oldName !== newName) {
+                    nameChanges.push(`${oldName} ➔ ${newName}`);
+                }
+                gameState.players[i].name = newName;
+            }
+
+            closeModal('editNamesOnlyModal');
+            updateUI();
+
+            if (nameChanges.length > 0) {
+                addLogSystem("修改玩家名稱", `名稱已更新：${nameChanges.join('；')}`);
+            }
+        }
+
+        function savePlayerNames(e) {
+            e.preventDefault();
+            saveSnapshot(); 
+            for (let i = 0; i < 4; i++) {
+                const nameInput = document.getElementById(`inputP${i}`).value.trim();
+                gameState.players[i].name = nameInput || `玩家 ${i + 1}`;
+                displayedAssets[i] = 10;
+            }
+
+            gameState.turnOrder = shuffleTurnOrder();
+            gameState.currentTurnIndex = 0;
+
+            closeAllModals();
+            updateUI();
+            playIntroAnimation();
+
+            const orderNames = gameState.turnOrder.map((id, index) => `${index + 1}. ${gameState.players[id].name}`).join(' ➔ ');
+            addLogSystem("遊戲開局", `順序隨機抽籤結果：${orderNames}`);
+        }
+
+        // 重新開始遊戲時關閉所有視窗後再播放動畫
+        function confirmReset() {
+            closeAllModals();
+
+            saveSnapshot();
+            gameState.players = [
+                { id: 0, name: gameState.players[0].name, asset: 10, isFrozen: false, hasBuff: false },
+                { id: 1, name: gameState.players[1].name, asset: 10, isFrozen: false, hasBuff: false },
+                { id: 2, name: gameState.players[2].name, asset: 10, isFrozen: false, hasBuff: false },
+                { id: 3, name: gameState.players[3].name, asset: 10, isFrozen: false, hasBuff: false }
+            ];
+            gameState.turnOrder = shuffleTurnOrder(); 
+            gameState.currentTurnIndex = 0;
+            gameState.status = 'GAME_ON';
+            gameState.statusMessage = '遊戲進行中';
+            gameState.statusReason = '請輸入實體撲克牌紀錄，或執行事件卡進行資產計算與勝負判定。';
+
+            for (let i = 0; i < 4; i++) {
+                displayedAssets[i] = 10;
+            }
+
+            isEndingShown = false;
+            updateUI();
+
+            playIntroAnimation();
+            
+            const orderNames = gameState.turnOrder.map((id, index) => `${index + 1}. ${gameState.players[id].name}`).join(' ➔ ');
+            addLogSystem("重置遊戲", `遊戲已重新開始！新輪流順序：${orderNames}`);
+        }
+
+        // GSAP 進入遊戲與重新開始入場動畫 (簡化為順序 P1 -> P4 純淡入)
+        function playIntroAnimation() {
+            gsap.fromTo('#siteHeader', { opacity: 0 }, { opacity: 1, duration: 0.4, ease: 'power1.out' });
+            gsap.fromTo('#playersGrid > div', 
+                { opacity: 0 }, 
+                { opacity: 1, duration: 0.4, stagger: 0.1, ease: 'power1.out' }
+            );
+            gsap.fromTo('.main-wood-box', 
+                { opacity: 0 }, 
+                { opacity: 1, duration: 0.4, delay: 0.2, ease: 'power1.out' }
+            );
+        }
+
+        // 保存 Snapshot (Undo/Redo)
+        function saveSnapshot() {
+            const snapshot = JSON.parse(JSON.stringify(gameState));
+            undoStack.push(snapshot);
+            redoStack = []; // 清空 Redo 堆疊
+            updateUndoRedoButtons();
+        }
+
+        function undoAction() {
+            if (undoStack.length === 0) return;
+            const currentSnapshot = JSON.parse(JSON.stringify(gameState));
+            redoStack.push(currentSnapshot);
+
+            const previousSnapshot = undoStack.pop();
+            gameState = previousSnapshot;
+            updateUI();
+            updateUndoRedoButtons();
+            addLogSystem("撤回操作", "取消了上一筆資產或事件卡操作。");
+        }
+
+        function redoAction() {
+            if (redoStack.length === 0) return;
+            const currentSnapshot = JSON.parse(JSON.stringify(gameState));
+            undoStack.push(currentSnapshot);
+
+            const nextSnapshot = redoStack.pop();
+            gameState = nextSnapshot;
+            updateUI();
+            updateUndoRedoButtons();
+            addLogSystem("復原操作", "重新執行了已撤回的操作。");
+        }
+
+        function updateUndoRedoButtons() {
+            document.getElementById('btnUndo').disabled = undoStack.length === 0;
+            document.getElementById('btnRedo').disabled = redoStack.length === 0;
+        }
+
+        // 切換目前出牌玩家
+        function setCurrentActor(playerIndex) {
+            const orderPos = gameState.turnOrder.indexOf(playerIndex);
+            if (orderPos !== -1) {
+                gameState.currentTurnIndex = orderPos;
+                updateUI();
+            }
+        }
+
+        // 輪流切換至下一位玩家
+        function advanceToNextTurn() {
+            if (gameState.status !== 'GAME_ON') return;
+            gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % 4;
+            updateUI();
+        }
+
+        // 花色選單改變時，動態更新數字範圍 (紅心/梅花 1~10, 菱形/黑桃 2~10)
+        function handleSuitChange() {
+            const suit = document.getElementById('selectSuit').value;
+            const selectCardValue = document.getElementById('selectCardValue');
+            const previousVal = parseInt(selectCardValue.value) || 1;
+
+            selectCardValue.innerHTML = '';
+            const minNum = (suit === 'diamonds' || suit === 'spades') ? 2 : 1;
+
+            for (let i = minNum; i <= 10; i++) {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `${i}`;
+                selectCardValue.appendChild(opt);
+            }
+
+            if (previousVal >= minNum && previousVal <= 10) {
+                selectCardValue.value = previousVal;
+            } else {
+                selectCardValue.value = minNum;
+            }
+        }
+
+        // 計算並驗證玩家輸入的答案
+        function handleCalculateSubmit(e) {
+            e.preventDefault();
+            if (gameState.status !== 'GAME_ON') {
+                showAlertModal("遊戲已結束", "目前遊戲已結束，無法再進行數字牌操作。");
+                return;
+            }
+
+            const actorId = parseInt(document.getElementById('selectActor').value);
+            const targetId = parseInt(document.getElementById('selectTarget').value);
+            const suit = document.getElementById('selectSuit').value;
+            const num = parseInt(document.getElementById('selectCardValue').value);
+            const userInput = parseFloat(document.getElementById('inputUserAnswer').value);
+
+            if (isNaN(userInput)) {
+                showAlertModal("請輸入答案", "請在「你的計算答案」欄位中輸入你自行算出的數字！");
+                return;
+            }
+
+            const actor = gameState.players[actorId];
+            const target = gameState.players[targetId];
+
+            // 檢查結冰凍結狀態
+            if (target.isFrozen) {
+                showAlertModal("目標已被凍結", `${target.name} 目前處於「絕對菱度」凍結狀態，當回合任何人都無法變動其資產！`);
+                return;
+            }
+
+            // 計算正確結果 (紅心: +10, 菱形: *num, 梅花: -10, 黑桃: /num)
+            const initialTargetAsset = target.asset;
+            let correctAsset = initialTargetAsset;
+            let opSymbol = '';
+            let valChangeStr = '';
+
+            if (suit === 'hearts') {
+                opSymbol = '＋';
+                const delta = num * 10;
+                correctAsset = initialTargetAsset + delta;
+                valChangeStr = `＋${delta}萬`;
+            } else if (suit === 'clubs') {
+                opSymbol = '－';
+                const delta = num * 10;
+                correctAsset = initialTargetAsset - delta;
+                valChangeStr = `－${delta}萬`;
+            } else if (suit === 'diamonds') {
+                opSymbol = '×';
+                correctAsset = initialTargetAsset * num;
+                valChangeStr = `× ${num} 倍`;
+            } else if (suit === 'spades') {
+                opSymbol = '÷';
+                correctAsset = initialTargetAsset / num;
+                valChangeStr = `÷ ${num}`;
+            }
+
+            // 精確度校正
+            correctAsset = Math.round(correctAsset * 100) / 100;
+
+            // 比對學生輸入的答案
+            if (Math.abs(userInput - correctAsset) > 0.01) {
+                // 驗證失敗：顯示算式提示，不洩漏最終數字
+                document.getElementById('equationHintText').textContent = `${target.name} 原資產 (${initialTargetAsset}萬) ${opSymbol} ${suit === 'hearts' || suit === 'clubs' ? num * 10 : num}`;
+                document.getElementById('equationHintBox').classList.remove('hidden');
+                
+                showAlertModal("計算結果不正確", "計算結果不正確，請重新計算！");
+                return;
+            }
+
+            // 驗證成功：隱藏算式提示
+            document.getElementById('equationHintBox').classList.add('hidden');
+            document.getElementById('inputUserAnswer').value = '';
+
+            // 檢查 BUFF 護盾 (桃之夭夭)
+            if (target.hasBuff) {
+                saveSnapshot();
+                target.hasBuff = false; // 抵擋一次後消除
+                updateUI();
+                showAlertModal("🛡️ 桃之夭夭 BUFF 生效", `${target.name} 的 BUFF 護盾成功抵擋了一次資產變動！資產保持不變，BUFF 已消除。`);
+                addLogSystem(actor.name, `對 ${target.name} 打出撲克牌，但被【桃之夭夭】護盾成功抵擋！`);
+                advanceToNextTurn();
+                return;
+            }
+
+            // 執行資產更新
+            saveSnapshot();
+            target.asset = correctAsset;
+
+            const cardNameMap = { hearts: '♥️ 紅心', diamonds: '♦️ 菱形', clubs: '♣️ 梅花', spades: '♠️ 黑桃' };
+            addLogTable(actor.name, target.name, `${cardNameMap[suit]} ${num}`, initialTargetAsset, valChangeStr, correctAsset);
+
+            // 自動檢測勝負與條件
+            checkGameRulesAndEvaluate();
+
+            // 完成後自動切換至下一位順位玩家
+            advanceToNextTurn();
+        }
+
+        // 快捷宣告破產
+        function handleDirectBankrupt() {
+            if (gameState.status !== 'GAME_ON') return;
+            const currentActorId = gameState.turnOrder[gameState.currentTurnIndex];
+            const player = gameState.players[currentActorId];
+
+            saveSnapshot();
+            const prevAsset = player.asset;
+            player.asset = -1; // 設定為負數標記破產
+
+            addLogTable(player.name, player.name, "直接宣告破產", prevAsset, "破產標記", -1);
+            checkGameRulesAndEvaluate();
+            advanceToNextTurn();
+        }
+
+        // ================= 自動勝負判定 ENGINE =================
+        function checkGameRulesAndEvaluate() {
+            // 規則 3: 特殊資產修正條件
+            // 若自己 > 500 萬，而其他所有玩家介於 400萬至 500萬 (含端點)，自己資產修正為 300 萬
+            for (let i = 0; i < 4; i++) {
+                const p = gameState.players[i];
+                if (p.asset > 500) {
+                    const othersInThreshold = gameState.players.every((other, idx) => {
+                        if (idx === i) return true;
+                        return other.asset >= 400 && other.asset <= 500;
+                    });
+
+                    if (othersInThreshold) {
+                        const oldAsset = p.asset;
+                        p.asset = 300; // 強制修正為 300 萬
+                        addLogSystem("資產修正判定", `${p.name} 原資產 > 500萬 且其他玩家介於 400~500萬，資產已自動調整修正為 300 萬！`);
+                    }
+                }
+            }
+
+            // 統計目前資產狀況
+            const bankruptPlayers = gameState.players.filter(p => p.asset < 0);
+            const activePlayers = gameState.players.filter(p => p.asset >= 0);
+
+            // 規則 5: 全員破產
+            if (bankruptPlayers.length === 4) {
+                gameState.status = 'ALL_BANKRUPT';
+                gameState.statusMessage = '全員破產，無人獲勝';
+                gameState.statusReason = '所有玩家的資產皆低於 0 萬，對局結束！';
+                updateUI();
+                showEndingModal('ALL_BANKRUPT', null);
+                return;
+            }
+
+            // 規則 2: 特殊直接勝利
+            // 其他所有玩家皆破產 (資產<0)，且自己資產 > 400萬
+            for (let i = 0; i < 4; i++) {
+                const p = gameState.players[i];
+                if (p.asset > 400) {
+                    const othersBankrupt = gameState.players.every((other, idx) => idx === i || other.asset < 0);
+                    if (othersBankrupt) {
+                        gameState.status = 'WINNER';
+                        gameState.statusMessage = `${p.name} 特殊直接獲勝！`;
+                        gameState.statusReason = `其他玩家皆已破產，且 ${p.name} 的資產超過 400 萬 (${p.asset}萬)！`;
+                        updateUI();
+                        showEndingModal('WINNER', p);
+                        return;
+                    }
+                }
+            }
+
+            // 規則 1: 一般勝利條件 (資產 > 500萬)
+            for (let i = 0; i < 4; i++) {
+                const p = gameState.players[i];
+                if (p.asset > 500) {
+                    gameState.status = 'WINNER';
+                    gameState.statusMessage = `${p.name} 達成一般勝利！`;
+                    gameState.statusReason = `${p.name} 資產已突破 500 萬大關 (目前 ${p.asset}萬)，成為超級資本家！`;
+                    updateUI();
+                    showEndingModal('WINNER', p);
+                    return;
+                }
+            }
+
+            // 規則 4: 淘汰條件判定 (自己 0~400萬 且 其他人皆破產 -> 自己被淘汰)
+            for (let i = 0; i < 4; i++) {
+                const p = gameState.players[i];
+                if (p.asset >= 0 && p.asset <= 400) {
+                    const othersBankrupt = gameState.players.every((other, idx) => idx === i || other.asset < 0);
+                    if (othersBankrupt) {
+                        // 當僅剩一人且未滿 400萬 時淘汰，導致全員無人獲勝
+                        gameState.status = 'ALL_BANKRUPT';
+                        gameState.statusMessage = '全員淘汰破產';
+                        gameState.statusReason = `${p.name} 資產未達 400萬 門檻，且其他人皆已破產，遭系統判定淘汰！`;
+                        updateUI();
+                        showEndingModal('ALL_BANKRUPT', null);
+                        return;
+                    }
+                }
+            }
+
+            // 正常進行中
+            gameState.status = 'GAME_ON';
+            gameState.statusMessage = '遊戲進行中';
+            gameState.statusReason = '請繼續進行撲克牌抽牌、出牌或打出事件卡。';
+            updateUI();
+        }
+
+
+        // ================= 事件卡發動與視窗引擎 =================
+
+        // 黑色 J: J富濟貧
+        function triggerBlackJ() {
+            if (gameState.status !== 'GAME_ON') return;
+            const bankrupts = gameState.players.filter(p => p.asset < 0);
+            if (bankrupts.length === 0) {
+                showAlertModal("無法使用事件卡", "目前沒有已破產的玩家，不能使用【J富濟貧】卡！");
+                return;
+            }
+
+            saveSnapshot();
+            let maxAsset = -Infinity;
+            gameState.players.forEach(p => { if (p.asset > maxAsset) maxAsset = p.asset; });
+            const richestPlayers = gameState.players.filter(p => p.asset === maxAsset);
+
+            const targetRich = richestPlayers[0];
+            const prevRichAsset = targetRich.asset;
+            const halfAsset = Math.floor(targetRich.asset / 2);
+            targetRich.asset = targetRich.asset - halfAsset;
+
+            const share = Math.floor(halfAsset / bankrupts.length);
+            bankrupts.forEach(b => {
+                b.asset = (b.asset < 0 ? 0 : b.asset) + share;
+            });
+
+            showAlertModal("🎉 事件卡使用成功", `已成功發動【黑色 J｜J富濟貧】！${targetRich.name} 資產減半 (-${halfAsset}萬)，資產已平均轉移給破產玩家。`);
+            addLogSystem("事件卡發動", `打出【黑色 J｜J富濟貧】：${targetRich.name} 資產減半 (-${halfAsset}萬)，轉移分給破產玩家！`);
+            checkGameRulesAndEvaluate();
+            advanceToNextTurn();
+        }
+
+        // 黑色 Q: 同生共死
+        function triggerBlackQ() {
+            if (gameState.status !== 'GAME_ON') return;
+            const activePlayers = gameState.players.filter(p => p.asset >= 0);
+            if (activePlayers.length === 0) return;
+
+            saveSnapshot();
+            let totalAsset = 0;
+            activePlayers.forEach(p => { totalAsset += p.asset; });
+            const avgAsset = Math.round((totalAsset / activePlayers.length) * 100) / 100;
+
+            activePlayers.forEach(p => { p.asset = avgAsset; });
+
+            showAlertModal("🎉 事件卡使用成功", `已成功發動【黑色 Q｜同生共死】！所有未破產玩家資產已收集並平均分配，每人最新資產為 ${avgAsset} 萬。`);
+            addLogSystem("事件卡發動", `打出【黑色 Q｜同生共死】：未破產玩家共計 ${totalAsset} 萬，重新平均分配為每人 ${avgAsset} 萬！`);
+            checkGameRulesAndEvaluate();
+            advanceToNextTurn();
+        }
+
+        // 黑色 K: 俺是皇上
+        function triggerBlackK() {
+            if (gameState.status !== 'GAME_ON') return;
+            saveSnapshot();
+            const actorId = gameState.turnOrder[gameState.currentTurnIndex];
+            const actor = gameState.players[actorId];
+
+            showAlertModal("🎉 事件卡使用成功", `${actor.name} 已成功使用【黑色 K｜俺是皇上】！此卡不計入行動次數，可以立即再進行一次行動！`);
+            addLogSystem("事件卡發動", `${actor.name} 打出【黑色 K｜俺是皇上】，獲得額外再行動一次的機會！`);
+            updateUI();
+        }
+
+        // 紅色 J: 是個善人 Modal 開啟
+        function openRedJModal() {
+            if (gameState.status !== 'GAME_ON') return;
+            const select = document.getElementById('selectRedJTarget');
+            select.innerHTML = '';
+            gameState.players.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = `${p.name} (${p.asset < 0 ? '已破產' : p.asset + '萬'})`;
+                select.appendChild(opt);
+            });
+            document.getElementById('redJModal').classList.remove('hidden');
+        }
+
+        // 紅色 J: 是個善人 Modal 執行
+        function executeRedJ() {
+            const targetId = parseInt(document.getElementById('selectRedJTarget').value);
+            const actorId = gameState.turnOrder[gameState.currentTurnIndex];
+            const donor = gameState.players[actorId];
+            const receiver = gameState.players[targetId];
+
+            saveSnapshot();
+            closeModal('redJModal');
+
+            if (donor.asset < 100) {
+                donor.asset = -1; // 少於 100 萬直接宣告破產
+                showAlertModal("🎉 事件卡使用成功", `${donor.name} 使用了【紅色 J｜是個善人】，由於自身資產少於 100 萬，直接宣告破產！`);
+                addLogSystem("事件卡發動", `${donor.name} 使用【紅色 J｜是個善人】，但自身資產少於 100 萬，直接破產！`);
+            } else {
+                donor.asset -= 100;
+                receiver.asset = (receiver.asset < 0 ? 0 : receiver.asset) + 100;
+                showAlertModal("🎉 事件卡使用成功", `${donor.name} 已成功發動【紅色 J｜是個善人】，捐贈 100 萬給 ${receiver.name}！`);
+                addLogSystem("事件卡發動", `${donor.name} 使用【紅色 J｜是個善人】，慷慨捐贈 100 萬給 ${receiver.name}！`);
+            }
+
+            checkGameRulesAndEvaluate();
+            advanceToNextTurn();
+        }
+
+        // 紅色 Q: 窮途末路
+        function triggerRedQ() {
+            if (gameState.status !== 'GAME_ON') return;
+            saveSnapshot();
+            gameState.players.forEach(p => {
+                p.asset -= 40;
+            });
+            showAlertModal("🎉 事件卡使用成功", `已成功發動【紅色 Q｜窮途末路】！所有玩家資產一律減少 40 萬。`);
+            addLogSystem("事件卡發動", `打出【紅色 Q｜窮途末路】：所有玩家資產一律減少 40 萬！`);
+            checkGameRulesAndEvaluate();
+            advanceToNextTurn();
+        }
+
+        // 紅色 K: 王從天降 Modal 開啟
+        function openRedKModal() {
+            if (gameState.status !== 'GAME_ON') return;
+            const selectUser = document.getElementById('selectRedKUser');
+            const selectVictim = document.getElementById('selectRedKVictim');
+            selectUser.innerHTML = '';
+            selectVictim.innerHTML = '';
+
+            gameState.players.forEach(p => {
+                const opt1 = document.createElement('option');
+                opt1.value = p.id;
+                opt1.textContent = p.name;
+                selectUser.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = p.id;
+                opt2.textContent = p.name;
+                selectVictim.appendChild(opt2);
+            });
+
+            // 設定預設出牌玩家為喊出者
+            const currentActorId = gameState.turnOrder[gameState.currentTurnIndex];
+            selectUser.value = currentActorId;
+
+            document.getElementById('redKModal').classList.remove('hidden');
+        }
+
+        // 紅色 K: 王從天降 Modal 執行
+        function executeRedK() {
+            const userId = parseInt(document.getElementById('selectRedKUser').value);
+            const victimId = parseInt(document.getElementById('selectRedKVictim').value);
+            const user = gameState.players[userId];
+            const victim = gameState.players[victimId];
+
+            saveSnapshot();
+            closeModal('redKModal');
+
+            showAlertModal("🎉 事件卡使用成功", `${user.name} 已成功使用【紅色 K｜王從天降】，成功抽取了 ${victim.name} 的 1 張手牌！`);
+            addLogSystem("事件卡發動", `${user.name} 搶先喊出「王從天降」打出【紅色 K】，成功抽取了 ${victim.name} 的 1 張手牌！`);
+            updateUI();
+            advanceToNextTurn();
+        }
+
+        // Joker: 大赦天下
+        function triggerJoker() {
+            if (gameState.status !== 'GAME_ON') return;
+            saveSnapshot();
+            let count = 0;
+            gameState.players.forEach(p => {
+                if (p.asset < 0) {
+                    p.asset = 300;
+                    count++;
+                }
+            });
+
+            showAlertModal("🎉 事件卡使用成功", `已成功發動【Joker｜大赦天下】！共有 ${count} 位已破產玩家恢復資產並設定為 300 萬！此卡不計入行動次數。`);
+            addLogSystem("事件卡發動", `打出【Joker｜大赦天下】：共有 ${count} 位已破產玩家恢復資產並重設為 300 萬！此卡不計入行動次數。`);
+            checkGameRulesAndEvaluate();
+        }
+
+        // 菱形 1: 絕對菱度 Modal 執行
+        function executeDiamond1() {
+            const targetId = parseInt(document.getElementById('selectDiamond1Target').value);
+            const target = gameState.players[targetId];
+
+            saveSnapshot();
+            closeModal('diamond1Modal');
+
+            gameState.players.forEach(p => p.isFrozen = false);
+            target.isFrozen = true;
+
+            showAlertModal("🎉 事件卡使用成功", `已成功發動【菱形 1｜絕對菱度】！${target.name} 的資產已被凍結，當回合無法進行變動。`);
+            addLogSystem("事件卡發動", `打出【菱形 1｜絕對菱度】：成功凍結 ${target.name} 的資產，當回合無法變動其資產！`);
+            updateUI();
+            advanceToNextTurn();
+        }
+
+        // 黑桃 1: 桃之夭夭 Modal 執行
+        function executeSpade1() {
+            const targetId = parseInt(document.getElementById('selectSpade1Target').value);
+            const target = gameState.players[targetId];
+
+            saveSnapshot();
+            closeModal('spade1Modal');
+
+            target.hasBuff = true;
+
+            showAlertModal("🎉 事件卡使用成功", `已成功發動【黑桃 1｜桃之夭夭】！已賦予 ${target.name} BUFF 護盾。`);
+            addLogSystem("事件卡發動", `打出【黑桃 1｜桃之夭夭】：賦予 ${target.name} 護盾 BUFF，可自動抵擋一次後續資產攻擊變動！`);
+            updateUI();
+            advanceToNextTurn();
+        }
+
+        // Joker: 大赦天下
+        function triggerJoker() {
+            if (gameState.status !== 'GAME_ON') return;
+            saveSnapshot();
+            let count = 0;
+            gameState.players.forEach(p => {
+                if (p.asset < 0) {
+                    p.asset = 300;
+                    count++;
+                }
+            });
+
+            addLogSystem("事件卡發動", `打出【🃏 Joker｜大赦天下】：共有 ${count} 位已破產玩家恢復資產並重設為 300 萬！此卡不計入行動次數。`);
+            checkGameRulesAndEvaluate();
+            // Joker 不計入行動次數，不 advanceToNextTurn()
+        }
+
+        // 菱形 1: 絕對菱度 Modal
+        function openDiamond1Modal() {
+            if (gameState.status !== 'GAME_ON') return;
+            const select = document.getElementById('selectDiamond1Target');
+            select.innerHTML = '';
+            gameState.players.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = `${p.name} ${p.isFrozen ? '(目前已凍結)' : ''}`;
+                select.appendChild(opt);
+            });
+            document.getElementById('diamond1Modal').classList.remove('hidden');
+        }
+
+        function executeDiamond1() {
+            const targetId = parseInt(document.getElementById('selectDiamond1Target').value);
+            const target = gameState.players[targetId];
+
+            saveSnapshot();
+            closeModal('diamond1Modal');
+
+            // 解除所有人凍結，僅設定當前目標
+            gameState.players.forEach(p => p.isFrozen = false);
+            target.isFrozen = true;
+
+            addLogSystem("事件卡發動", `打出【♦️ 菱形 1｜絕對菱度】：成功凍結 ${target.name} 的資產，當回合無法變動其資產！`);
+            updateUI();
+            advanceToNextTurn();
+        }
+
+        // 黑桃 1: 桃之夭夭 Modal
+        function openSpade1Modal() {
+            if (gameState.status !== 'GAME_ON') return;
+            const select = document.getElementById('selectSpade1Target');
+            select.innerHTML = '';
+            gameState.players.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = `${p.name} ${p.hasBuff ? '(目前已擁有BUFF)' : ''}`;
+                select.appendChild(opt);
+            });
+            document.getElementById('spade1Modal').classList.remove('hidden');
+        }
+
+        function executeSpade1() {
+            const targetId = parseInt(document.getElementById('selectSpade1Target').value);
+            const target = gameState.players[targetId];
+
+            saveSnapshot();
+            closeModal('spade1Modal');
+
+            target.hasBuff = true;
+
+            addLogSystem("事件卡發動", `打出【♠️ 黑桃 1｜桃之夭夭】：賦予 ${target.name} 護盾 BUFF，可自動抵擋一次後續資產攻擊變動！`);
+            updateUI();
+            advanceToNextTurn();
+        }
+
+
+        // ================= UI 繪製與碼表計數器 Engine =================
+        function updateUI() {
+            const currentActorId = gameState.turnOrder[gameState.currentTurnIndex];
+
+            // 1. 繪製 4 位玩家資訊卡片 (純淨無頭像版面)
+            const grid = document.getElementById('playersGrid');
+            grid.innerHTML = '';
+
+            gameState.players.forEach((player, index) => {
+                const isCurrentTurn = (player.id === currentActorId);
+                const orderPosition = gameState.turnOrder.indexOf(player.id) + 1;
+
+                let cardClasses = "relative bg-brand-cream rounded-3xl p-5 border-4 transition-all shadow-xl hover-lift space-y-3 flex flex-col justify-between ";
+                if (player.isFrozen) {
+                    cardClasses += "frozen-card ";
+                } else if (player.hasBuff) {
+                    cardClasses += "shield-card border-brand-sage ";
+                } else if (isCurrentTurn) {
+                    cardClasses += "active-turn-card border-brand-cyan bg-white ";
+                } else {
+                    cardClasses += "border-brand-sage/60 ";
+                }
+
+                // 資產狀態標籤
+                let statusBadge = '';
+                if (player.asset < 0) {
+                    statusBadge = `<span class="bg-brand-pink text-white text-[10px] px-2 py-0.5 rounded-full font-black">已破產</span>`;
+                } else if (player.asset <= 400) {
+                    statusBadge = `<span class="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black">危險狀態</span>`;
+                } else if (player.asset > 500) {
+                    statusBadge = `<span class="bg-brand-lime text-brand-purple text-[10px] px-2 py-0.5 rounded-full font-black">勝利門檻待判定</span>`;
+                } else {
+                    statusBadge = `<span class="bg-brand-cyan text-brand-purple text-[10px] px-2 py-0.5 rounded-full font-black">狀態正常</span>`;
+                }
+
+                // BUFF / 凍結標記
+                let buffIcons = '';
+                if (player.hasBuff) buffIcons += `<span class="text-xs bg-brand-lime text-brand-purple px-2 py-0.5 rounded-full font-black border border-brand-purple/20">🛡️ BUFF護盾</span>`;
+                if (player.isFrozen) buffIcons += `<span class="text-xs bg-sky-500 text-white px-2 py-0.5 rounded-full font-black">❄️ 凍結中</span>`;
+
+                const cardHtml = `
+                    <div onclick="setCurrentActor(${player.id})" class="${cardClasses} cursor-pointer">
+                        ${player.asset < 0 ? '<div class="bankrupt-stamp">BANKRUPT</div>' : ''}
+                        
+                        <div class="flex items-center justify-between border-b border-brand-sage/30 pb-2">
+                            <div class="flex items-center gap-1.5">
+                                <span class="bg-brand-purple text-brand-cyan text-xs font-black px-2 py-0.5 rounded-lg">第 ${orderPosition} 順位</span>
+                                ${isCurrentTurn ? '<span class="bg-brand-cyan text-brand-purple text-xs font-black px-2 py-0.5 rounded-lg border border-brand-purple/30">🎯 當前出牌</span>' : ''}
+                            </div>
+                            <div>${statusBadge}</div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <h3 class="text-lg font-black text-brand-purple flex items-center justify-between">
+                                <span>${player.name}</span>
+                                <span class="text-xs text-brand-purple/60 font-medium">P${player.id + 1}</span>
+                            </h3>
+
+                            <!-- 碼表滾動數字容器 -->
+                            <div class="flex items-baseline gap-1 py-1">
+                                <span id="assetNumP${player.id}" class="text-3xl sm:text-4xl font-black text-brand-purple tracking-tight">
+                                    ${displayedAssets[player.id]}
+                                </span>
+                                <span class="text-sm font-black text-brand-purple/80">萬</span>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-1 min-h-[24px]">
+                            ${buffIcons}
+                        </div>
+                    </div>
+                `;
+                grid.innerHTML += cardHtml;
+            });
+
+            // 動態碼表數字計數器 Roll Animation
+            gameState.players.forEach(player => {
+                const targetVal = Math.round(player.asset * 100) / 100;
+                const startVal = displayedAssets[player.id];
+                const elem = document.getElementById(`assetNumP${player.id}`);
+
+                if (elem && startVal !== targetVal) {
+                    const obj = { val: startVal };
+                    gsap.to(obj, {
+                        val: targetVal,
+                        duration: 0.8,
+                        ease: 'power1.out',
+                        onUpdate: function() {
+                            const currentFormatted = Math.round(obj.val * 100) / 100;
+                            elem.textContent = currentFormatted;
+                        },
+                        onComplete: function() {
+                            displayedAssets[player.id] = targetVal;
+                        }
+                    });
+                }
+            });
+
+            // 2. 更新表單 Form 選單 Option
+            const selectActor = document.getElementById('selectActor');
+            const selectTarget = document.getElementById('selectTarget');
+            selectActor.innerHTML = '';
+            selectTarget.innerHTML = '';
+
+            gameState.players.forEach(p => {
+                const opt1 = document.createElement('option');
+                opt1.value = p.id;
+                opt1.textContent = `${p.name} (P${p.id + 1})`;
+                if (p.id === currentActorId) opt1.selected = true;
+                selectActor.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = p.id;
+                opt2.textContent = `${p.name} (${p.asset < 0 ? '已破產' : p.asset + '萬'})`;
+                selectTarget.appendChild(opt2);
+            });
+
+            // 3. 更新遊戲狀態 Banner
+            document.getElementById('gameStatusText').textContent = gameState.statusMessage;
+        }
+
+        // 新增 Log 到歷史紀錄表格
+        function addLogTable(actorName, targetName, cardInfo, prevVal, changeVal, newVal) {
+            const timeStr = new Date().toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const table = document.getElementById('historyLogTable');
+            const row = document.createElement('tr');
+            row.className = "hover:bg-brand-cream transition";
+            row.innerHTML = `
+                <td class="p-3 font-mono text-xs text-gray-500">${timeStr}</td>
+                <td class="p-3 font-bold">${actorName}</td>
+                <td class="p-3 font-bold">${targetName}</td>
+                <td class="p-3 font-black text-brand-purple">${cardInfo}</td>
+                <td class="p-3">${prevVal} 萬</td>
+                <td class="p-3 font-black ${String(changeVal).includes('－') ? 'text-brand-pink' : 'text-brand-lime'}">${changeVal}</td>
+                <td class="p-3 font-black text-brand-purple">${newVal} 萬</td>
+            `;
+            table.insertBefore(row, table.firstChild);
+        }
+
+        function addLogSystem(title, detail) {
+            addLogTable("系統判定", title, detail, "-", "-", "-");
+        }
+
+        // ================= 頁面切換與 MODAL 系統 =================
+        function switchPage(pageKey) {
+            document.getElementById('pageMain').classList.add('hidden');
+            document.getElementById('pageCards').classList.add('hidden');
+            document.getElementById('pageRules').classList.add('hidden');
+
+            document.getElementById('tabMain').className = "px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black bg-brand-purple text-white hover:bg-brand-dark-purple border border-white/20 hover-lift transition flex items-center gap-1";
+            document.getElementById('tabCards').className = "px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black bg-brand-purple text-white hover:bg-brand-dark-purple border border-white/20 hover-lift transition flex items-center gap-1";
+            document.getElementById('tabRules').className = "px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black bg-brand-purple text-white hover:bg-brand-dark-purple border border-white/20 hover-lift transition flex items-center gap-1";
+
+            if (pageKey === 'main') {
+                document.getElementById('pageMain').classList.remove('hidden');
+                document.getElementById('tabMain').className = "px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black bg-brand-cyan text-brand-purple shadow hover-lift transition flex items-center gap-1";
+            } else if (pageKey === 'cards') {
+                document.getElementById('pageCards').classList.remove('hidden');
+                document.getElementById('tabCards').className = "px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black bg-brand-cyan text-brand-purple shadow hover-lift transition flex items-center gap-1";
+            } else if (pageKey === 'rules') {
+                document.getElementById('pageRules').classList.remove('hidden');
+                document.getElementById('tabRules').className = "px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black bg-brand-cyan text-brand-purple shadow hover-lift transition flex items-center gap-1";
+            }
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function showAlertModal(title, msg) {
+            document.getElementById('alertTitle').textContent = title;
+            document.getElementById('alertMessage').textContent = msg;
+            document.getElementById('alertModal').classList.remove('hidden');
+        }
+
+        function showCardDetail(key) {
+            const data = CARD_DESCRIPTIONS[key];
+            if (!data) return;
+            document.getElementById('cardDetailSuit').textContent = data.suit;
+            document.getElementById('cardDetailTitle').textContent = data.title;
+            document.getElementById('cardDetailText').textContent = data.text;
+            document.getElementById('cardDetailModal').classList.remove('hidden');
+        }
+
+        function showEndingModal(type, winnerPlayer) {
+            if (isEndingShown) return;
+            isEndingShown = true;
+
+            const modal = document.getElementById('gameEndingModal');
+            const title = document.getElementById('endingTitle');
+            const subtitle = document.getElementById('endingSubtitle');
+            const details = document.getElementById('endingDetails');
+            const icon = document.getElementById('endingIconContainer');
+
+            if (type === 'WINNER') {
+                title.textContent = `恭喜 ${winnerPlayer.name} 獲勝！`;
+                subtitle.textContent = "恭喜成為超級資本家！";
+                icon.innerHTML = `<i class="fa-solid fa-trophy text-amber-400"></i>`;
+                details.innerHTML = `
+                    <p class="font-black text-sm text-brand-purple">勝利原因：${gameState.statusReason}</p>
+                    <p class="text-xs text-brand-purple/80">最終資產：${winnerPlayer.asset} 萬</p>
+                `;
+
+                // 播放金幣彩帶特效 Confetti
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+
+            } else if (type === 'ALL_BANKRUPT') {
+                title.textContent = "全員破產，無人獲勝！";
+                subtitle.textContent = "所有玩家的資產均已歸零或扣至負數。";
+                icon.innerHTML = `<i class="fa-solid fa-skull-crossbones text-brand-pink"></i>`;
+                details.innerHTML = `
+                    <p class="font-black text-sm text-brand-pink">判定原因：${gameState.statusReason}</p>
+                `;
+            }
+
+            modal.classList.remove('hidden');
+            gsap.fromTo('#endingCardWrapper', { scale: 0.7, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.7)' });
+        }
+    </script>
+</body>
+</html>
